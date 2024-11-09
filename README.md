@@ -1,5 +1,5 @@
 ---
-title: Gradio Lite
+title: Gr
 emoji: 🖼️
 colorFrom: yellow
 colorTo: red
