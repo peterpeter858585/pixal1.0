@@ -20,22 +20,131 @@
     <body>
         <gradio-lite>
             <gradio-file name="app.py" entrypoint>
+                from tqdm import tqdm
+from subprocess import Popen, PIPE as P
+b=Popen("wget 1https://huggingface.co/peterpeter8585/deepseek-llm-7b-chat-Q8_0-GGUF/resolve/main/deepseek-llm-7b-chat-q8_0.gguf -O ./model.gguf",shell=True,stderr=P,stdout=P)
+print(b.stdout.read()+b.stderr.read())
+from langchain_experimental.tools.python.tool import PythonREPLTool as PYT
+from langchain.agents import load_tools, create_structured_chat_agent as Agent,AgentExecutor as Ex, AgentType as Type
+from langchain.agents.agent_toolkits import create_retriever_tool as crt
+from langchain_community.agent_toolkits import FileManagementToolkit as FMT
+from langchain.tools import Tool,YouTubeSearchTool as YTS
+from langchain.memory import ConversationBufferMemory as MEM,RedisChatMessageHistory as HIS
+from langchain.schema import SystemMessage as SM,HumanMessage as HM, AIMessage as AM
+from langchain import hub
+import os
+import torch
+from langchain import hub
+torch.set_flush_denormal(True)
+import importlib.util
+import logging
+from typing import Any, Dict, Iterator, List, Mapping, Optional
+#system = '''Respond to the human as helpfully and accurately as possible. You have access to the following tools:
+
+#{tools}
+
+#Use a json blob to specify a tool by providing an action key (tool name) and an action_input key (tool input).
+
+#Valid "action" values: "Final Answer" or {tool_names}
+
+#Provide only ONE action per $JSON_BLOB, as shown:
+
+#```
+#{{
+  #"action": $TOOL_NAME,
+ # "action_input": $INPUT
+#}}
+#```
+#'''
+#Follow this format:
+
+#Question: input question to answer
+#Thought: consider previous and subsequent steps
+#Action:
+#```
+#$JSON_BLOB
+#```
+#Observation: action result
+#... (repeat Thought/Action/Observation N times)
+#Thought: I know what to respond
+#Action:
+#```
+#{
+  #"action": "Final Answer",
+  #"action_input": "Final response to human"
+#}}
+
+#Begin! Reminder to ALWAYS respond with a valid json blob of a single action. Use tools if necessary. Respond directly if appropriate. Format is Action:```$JSON_BLOB```then Observation'''
+#'''
+
+
+#(reminder to respond in a JSON blob no matter what)'''
+
+prompt=hub.pull("hwchase17/structured-chat-agent")
+from typing import Any, Dict, List, Optional
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from langchain_core.outputs import ChatResult, ChatGeneration
+from langchain_core.callbacks.manager import CallbackManagerForLLMRun
+from langchain_core.callbacks.manager import AsyncCallbackManagerForLLMRun
+from langchain_core.runnables import run_in_executor
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import requests
+import os
+#from transformers import pipeline,AutoModelForCausalLM as M,AutoTokenizer as T
+#m=M.from_pretrained("peterpeter8585/syai4.3")
+#t=T.from_pretrained("peterpeter8585/syai4.3")
+#pipe=pipeline(model=m,tokenizer=t,task="text-generation")
+import multiprocessing
+
+from langchain.llms import GPT4All
+
+llm = GPT4All(model=("./model.gguf"))
+from langchain.retrievers import WikipediaRetriever as Wiki
 import gradio as gr
-
-from filters import as_gray
-
-def process(input_image):
-    output_image = as_gray(input_image)
-    return output_image
-
-demo = gr.Interface(
-    process,
-    "image",
-    "image",
-    examples=["lion.jpg", "logo.png"],
+chatbot = gr.Chatbot(
+    label="SYAI4.1",
+    show_copy_button=True,
+    layout="panel"
 )
-
-demo.launch()
+def terminal(c):
+    a=Popen(c,shell=True,stdin=P,stdout=P,stderr=P)
+    return a.stdout.read()+a.stderr.read()
+tools=FMT().get_tools()
+tools.append(PYT())
+tools.append(YTS())
+tools.extend(load_tools(["requests_all"],allow_dangerous_tools=True))
+tools.extend(load_tools(["llm-math","ddg-search"],llm=llm))
+tools.append(Tool.from_function(func=terminal,name="terminal",description="터미널 명령어실행에 적합함"))
+memory=MEM()
+tools.append(crt(name="wiki",description="위키 백과를 검색하여 정보를 가져온다",retriever=Wiki(lang="ko",top_k_results=1)))
+agent=Ex(agent=Agent(llm,tools,prompt),tools=tools,verbose=True,handle_parsing_errors=True,memory=memory)
+def chat(message,
+    history: list[tuple[str, str]],
+    system_message,
+    max_tokens,
+    temperature,
+    top_p, chat_session):
+    return agent.invoke({"input":message})
+ai1=gr.ChatInterface(
+    chat,
+    chatbot=chatbot,
+    additional_inputs=[
+        gr.Textbox(value="You are a helpful assistant.", label="System message",  interactive=True),
+        gr.Slider(minimum=1, maximum=2048, value=512, step=1, label="Max new tokens"),
+        gr.Slider(minimum=0.1, maximum=4.0, value=0.1, step=0.1, label="Temperature"),
+        gr.Slider(
+            minimum=0.1,
+            maximum=1.0,
+            value=0.1,
+            step=0.05,
+            label="Top-p (nucleus sampling)",
+        ),
+        gr.Textbox(label="chat_id(please enter the chat id!)")
+    ],
+    
+)
+ai1.launch()
             </gradio-file>
 
             <gradio-file name="filters.py">
@@ -45,12 +154,25 @@ def as_gray(image):
     return rgb2gray(image)
             </gradio-file>
 
-            <gradio-file name="lion.jpg" url="https://raw.githubusercontent.com/gradio-app/gradio/main/gradio/test_data/lion.jpg" />
-            <gradio-file name="logo.png" url="https://raw.githubusercontent.com/gradio-app/gradio/main/guides/assets/logo.png" />
+            <gradio-file name="model.gguf" url="" />
 
             <gradio-requirements>
-# Same syntax as requirements.txt
-scikit-image
+langchain_community
+langchain
+langchain_experimental
+torch
+transformers
+langchain-core
+bs4
+wikipedia
+redis
+requests
+huggingface_hub
+duckduckgo-search
+youtube_search
+numexpr
+pydantic
+gpt4all
             </gradio-requirements>
         </gradio-lite>
     </body>
