@@ -22,8 +22,8 @@
             <gradio-file name="app.py" entrypoint>
                 from tqdm import tqdm
 from subprocess import Popen, PIPE as P
-b=Popen("wget 1https://huggingface.co/peterpeter8585/deepseek-llm-7b-chat-Q8_0-GGUF/resolve/main/deepseek-llm-7b-chat-q8_0.gguf -O ./model.gguf",shell=True,stderr=P,stdout=P)
-print(b.stdout.read()+b.stderr.read())
+#b=Popen("wget 1https://huggingface.co/peterpeter8585/deepseek-llm-7b-chat-Q8_0-GGUF/resolve/main/deepseek-llm-7b-chat-q8_0.gguf -O ./model.gguf",shell=True,stderr=P,stdout=P)
+#print(b.stdout.read()+b.stderr.read())
 from langchain_experimental.tools.python.tool import PythonREPLTool as PYT
 from langchain.agents import load_tools, create_structured_chat_agent as Agent,AgentExecutor as Ex, AgentType as Type
 from langchain.agents.agent_toolkits import create_retriever_tool as crt
